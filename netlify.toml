@@ -1,0 +1,20 @@
+[build]
+  publish = "."
+
+[functions]
+  directory = "netlify/functions"
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+
+[[redirects]]
+  from = "/healthz"
+  to = "/.netlify/functions/api"
+  status = 200
+
+[[redirects]]
+  from = "/media/gallery/*"
+  to = "/.netlify/functions/api"
+  status = 200
