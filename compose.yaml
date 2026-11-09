@@ -1,0 +1,58 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    init: true
+    environment:
+      NODE_ENV: production
+      PORT: "8080"
+      HOST: 0.0.0.0
+      APP_ORIGIN: https://${SALON_DOMAIN:?Set SALON_DOMAIN in .env}
+      SALON_DATA_DIR: /data
+      SALON_OWNER_PASSWORD_FILE: /run/secrets/owner_password
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_PLACES_API_KEY: ${GOOGLE_PLACES_API_KEY:-}
+      GOOGLE_PLACE_ID: ${GOOGLE_PLACE_ID:-}
+      WHATSAPP_ACCESS_TOKEN: ${WHATSAPP_ACCESS_TOKEN:-}
+      WHATSAPP_PHONE_NUMBER_ID: ${WHATSAPP_PHONE_NUMBER_ID:-}
+      WHATSAPP_TEMPLATE_NAME: ${WHATSAPP_TEMPLATE_NAME:-}
+      WHATSAPP_TEMPLATE_LANGUAGE: ${WHATSAPP_TEMPLATE_LANGUAGE:-en}
+      WHATSAPP_GRAPH_VERSION: ${WHATSAPP_GRAPH_VERSION:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      BOOKING_EMAIL_FROM: ${BOOKING_EMAIL_FROM:-}
+    secrets:
+      - owner_password
+    volumes:
+      - salon_data:/data
+    expose:
+      - "8080"
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      SALON_DOMAIN: ${SALON_DOMAIN:?Set SALON_DOMAIN in .env}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+secrets:
+  owner_password:
+    file: ./secrets/owner_password.txt
+volumes:
+  salon_data:
+  caddy_data:
+  caddy_config:

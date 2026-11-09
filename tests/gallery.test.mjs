@@ -1,0 +1,47 @@
+import {test} from 'node:test';
+import assert from 'node:assert/strict';
+import {spawn} from 'node:child_process';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import net from 'node:net';
+import {randomUUID} from 'node:crypto';
+import {fileURLToPath} from 'node:url';
+const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..');
+test('Gallery owner uploads, public visibility and Google Maps embed',{timeout:30000},async()=>{
+ const temp=fs.mkdtempSync(path.join(os.tmpdir(),'vinayak-gallery-'));let child;
+ try{
+  const probe=net.createServer();await new Promise(r=>probe.listen(0,'127.0.0.1',r));const port=probe.address().port;await new Promise(r=>probe.close(r));
+  const base=`http://127.0.0.1:${port}`,origin='https://gallery.example.test',password='owner-test-'+randomUUID();
+  child=spawn(process.execPath,['server.mjs'],{cwd:root,env:{...process.env,NODE_ENV:'production',APP_ORIGIN:origin,PORT:String(port),HOST:'127.0.0.1',SALON_DATA_DIR:temp,SALON_OWNER_PASSWORD:password,SALON_OWNER_PASSWORD_FILE:''},stdio:['ignore','pipe','pipe']});
+  await new Promise((resolve,reject)=>{const t=setTimeout(()=>reject(Error('Startup timeout')),10000);child.stdout.once('data',()=>{clearTimeout(t);resolve()});child.once('exit',code=>{clearTimeout(t);reject(Error('Startup failed: '+code))});});
+  let cookie='';
+  const api=(url,method='GET',body,owner=false,mime='application/json')=>fetch(base+url,{method,headers:{Origin:origin,...(body?{'Content-Type':mime}:{}),...(owner?{Cookie:cookie}:{})},body:body?(Buffer.isBuffer(body)?body:JSON.stringify(body)):undefined});
+  assert.equal((await api('/api/owner/gallery')).status,401);
+  assert.deepEqual(await(await api('/api/gallery')).json(),[]);
+  const login=await api('/api/login','POST',{password});assert.equal(login.status,200);cookie=login.headers.get('set-cookie').split(';')[0];
+  assert.equal((await api('/api/owner/offer','GET',undefined,true)).status,200);
+  assert.equal((await fetch(base+'/api/owner/offer',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({title:'x',details:'x',expires:'2099-12-31',published:true})})).status,401);
+  const offer={title:'Test studio offer',details:'Test conditions only',expires:'2099-12-31',published:true};
+  assert.equal((await api('/api/owner/offer','POST',offer,true)).status,200);
+  assert.deepEqual((await(await api('/api/offer')).json()).offer,offer);
+  assert.equal((await api('/api/owner/offer','POST',{...offer,expires:'2099-02-30'},true)).status,400);
+  await api('/api/owner/offer','POST',{...offer,published:false},true);
+  assert.equal((await(await api('/api/offer')).json()).offer,null);
+  await api('/api/owner/offer','POST',{...offer,expires:'2000-01-01'},true);
+  assert.equal((await(await api('/api/offer')).json()).offer,null);
+  const homepage=await(await api('/')).text();assert.match(homepage,/Customer Feedback/);assert.match(homepage,/Popular services/);assert.match(homepage,/id="salon-photos"/);
+  for(const url of ['/home-gallery.mjs','/home-content.mjs','/owner-offer.mjs'])assert.equal((await api(url)).status,200);
+  const photo=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/lZkAAAAASUVORK5CYII=','base64');
+  assert.equal((await api('/api/owner/gallery?title=Test','POST',photo,false,'image/png')).status,401);
+  assert.equal((await api('/api/owner/gallery?title=Invalid','POST',Buffer.from('not a photo'),true,'image/png')).status,400);
+  assert.equal((await api('/api/owner/gallery?title=SVG','POST',Buffer.from('<svg/>'),true,'image/svg+xml')).status,415);
+  const upload=await api('/api/owner/gallery?title=Studio%20photo','POST',photo,true,'image/png');assert.equal(upload.status,201);const p=await upload.json();
+  const publicPhotos=await(await api('/api/gallery')).json();assert.equal(publicPhotos.length,1);assert.equal(publicPhotos[0].title,'Studio photo');assert.equal(publicPhotos[0].filename,undefined);
+  const image=await api(p.url);assert.equal(image.status,200);assert.equal(image.headers.get('content-type'),'image/png');assert.deepEqual(Buffer.from(await image.arrayBuffer()),photo);
+  assert.equal((await api('/api/owner/gallery','PATCH',{id:p.id,published:false},true)).status,200);assert.equal((await(await api('/api/gallery')).json()).length,0);assert.equal((await api(p.url)).status,401);assert.equal((await api(p.url,'GET',undefined,true)).status,200);
+  assert.equal((await api('/api/owner/gallery','PATCH',{id:p.id,published:true},true)).status,200);assert.equal((await(await api('/api/gallery')).json()).length,1);
+  const page=await api('/gallery.html');assert.equal(page.status,200);assert.match(await page.text(),/https:\/\/www\.google\.com\/maps\/embed\?pb=/);assert.match(page.headers.get('content-security-policy'),/frame-src https:\/\/www.google.com/);
+  assert.equal((await api('/gallery.mjs')).status,200);assert.equal((await api('/owner-gallery.mjs')).status,200);
+ }finally{if(child&&child.exitCode===null)await new Promise(r=>{child.once('exit',r);child.kill('SIGTERM')});const resolved=path.resolve(temp);if(!resolved.startsWith(path.resolve(os.tmpdir())+path.sep)||!path.basename(resolved).startsWith('vinayak-gallery-'))throw Error('Unexpected cleanup path');fs.rmSync(resolved,{recursive:true,force:true});}
+});

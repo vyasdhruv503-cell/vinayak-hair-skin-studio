@@ -1,0 +1,10 @@
+.env
+.env.*
+!.env.example
+secrets/
+data/
+.data/
+node_modules/
+*.sqlite*
+*.db*
+*.zip
