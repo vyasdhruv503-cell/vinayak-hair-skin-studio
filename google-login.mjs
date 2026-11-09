@@ -28,72 +28,81 @@ const profileArea = document.querySelector('#google-signin');
 const profileMessage = document.querySelector('#google-login-message');
 const bookingArea = document.querySelector('#booking-google-signin');
 
+window.handleGoogleCredentialResponse = async function (result) {
+  if (profileMessage) profileMessage.textContent = 'Signing in with Google…';
+  try {
+    let signedInSuccessfully = false;
+    try {
+      const signedIn = await fetch('/api/customer/google-login', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({credential: result.credential})
+      });
+      if (signedIn.ok) {
+        signedInSuccessfully = true;
+      } else if (signedIn.status !== 404) {
+        const data = await signedIn.json().catch(() => ({}));
+        throw Error(data.error || 'Google sign-in failed.');
+      }
+    } catch (err) {
+      if (err.message && err.message.includes('Google sign-in failed')) throw err;
+    }
+
+    if (!signedInSuccessfully) {
+      const payload = parseGoogleJwt(result.credential);
+      if (payload && payload.sub) {
+        const customer = {
+          id: payload.sub,
+          username: 'g' + payload.sub.slice(0, 10),
+          name: payload.name || 'Google customer',
+          email: payload.email || '',
+          phone: '',
+          provider: 'google',
+          created: new Date().toISOString()
+        };
+        localStorage.setItem('vinayak_customer', JSON.stringify(customer));
+        signedInSuccessfully = true;
+      }
+    }
+
+    if (signedInSuccessfully) {
+      location.reload();
+    } else {
+      throw Error('Google sign-in could not be completed.');
+    }
+  } catch (error) {
+    if (profileMessage) profileMessage.textContent = error.message;
+  }
+};
+
 if (profileArea || bookingArea) {
   try {
     const clientId = await resolveClientId();
     if (clientId) {
-      const script = document.createElement('script');
-      script.src = 'https://accounts.google.com/gsi/client';
-      script.async = true;
-      script.onload = () => {
+      const ensureScript = () => {
         if (!window.google?.accounts?.id) {
-          if (profileMessage) profileMessage.textContent = 'Google sign-in could not load. Please use your username instead.';
-          return;
+          const script = document.createElement('script');
+          script.src = 'https://accounts.google.com/gsi/client';
+          script.async = true;
+          script.defer = true;
+          script.onload = initGsi;
+          document.head.append(script);
+        } else {
+          initGsi();
         }
+      };
+
+      const initGsi = () => {
+        if (!window.google?.accounts?.id) return;
         window.google.accounts.id.initialize({
           client_id: clientId,
-          callback: async result => {
-            if (profileMessage) profileMessage.textContent = 'Signing in with Google…';
-            try {
-              let signedInSuccessfully = false;
-              try {
-                const signedIn = await fetch('/api/customer/google-login', {
-                  method: 'POST',
-                  headers: {'Content-Type': 'application/json'},
-                  body: JSON.stringify({credential: result.credential})
-                });
-                if (signedIn.ok) {
-                  signedInSuccessfully = true;
-                } else if (signedIn.status !== 404) {
-                  const data = await signedIn.json().catch(() => ({}));
-                  throw Error(data.error || 'Google sign-in failed.');
-                }
-              } catch (err) {
-                if (err.message && err.message.includes('Google sign-in failed')) throw err;
-              }
-
-              if (!signedInSuccessfully) {
-                const payload = parseGoogleJwt(result.credential);
-                if (payload && payload.sub) {
-                  const customer = {
-                    id: payload.sub,
-                    username: 'g' + payload.sub.slice(0, 10),
-                    name: payload.name || 'Google customer',
-                    email: payload.email || '',
-                    phone: '',
-                    provider: 'google',
-                    created: new Date().toISOString()
-                  };
-                  localStorage.setItem('vinayak_customer', JSON.stringify(customer));
-                  signedInSuccessfully = true;
-                }
-              }
-
-              if (signedInSuccessfully) {
-                location.reload();
-              } else {
-                throw Error('Google sign-in could not be completed.');
-              }
-            } catch (error) {
-              if (profileMessage) profileMessage.textContent = error.message;
-            }
-          }
+          callback: window.handleGoogleCredentialResponse
         });
 
         if (profileArea) {
           profileArea.hidden = false;
           const buttonEl = document.querySelector('#google-button');
-          if (buttonEl) {
+          if (buttonEl && !buttonEl.hasChildNodes()) {
             window.google.accounts.id.renderButton(buttonEl, {
               type: 'standard',
               theme: 'outline',
@@ -110,7 +119,7 @@ if (profileArea || bookingArea) {
           if (!stored) {
             bookingArea.hidden = false;
             const bookingBtn = document.querySelector('#booking-google-button');
-            if (bookingBtn) {
+            if (bookingBtn && !bookingBtn.hasChildNodes()) {
               window.google.accounts.id.renderButton(bookingBtn, {
                 type: 'standard',
                 theme: 'outline',
@@ -123,10 +132,12 @@ if (profileArea || bookingArea) {
           }
         }
       };
-      script.onerror = () => {
-        if (profileMessage) profileMessage.textContent = 'Google sign-in could not load. Please use your username instead.';
-      };
-      document.head.append(script);
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', ensureScript);
+      } else {
+        ensureScript();
+      }
     }
   } catch (error) {
     if (profileMessage) profileMessage.textContent = error.message;

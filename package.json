@@ -4,9 +4,10 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=24.0.0 <27"
+    "node": ">=20.0.0 <27"
   },
   "scripts": {
+    "build": "echo 'Build ready'",
     "start": "node --env-file-if-exists=.env server.mjs",
     "test": "node --test tests/deployment.test.mjs tests/customer.test.mjs tests/gallery.test.mjs tests/google-rating.test.mjs tests/pwa.test.mjs tests/google-auth.test.mjs tests/notifications.test.mjs",
     "check": "node --check server.mjs && node --check booking.mjs && node --check owner.mjs && node --check profile.mjs && node --check gallery.mjs && node --check owner-gallery.mjs && node --check rating.mjs && node --check google-rating.mjs && node --check app.mjs && node --check sw.js && node --check home-gallery.mjs && node --check home-content.mjs && node --check owner-offer.mjs && node --check google-auth.mjs && node --check google-login.mjs && node --check salon-info.mjs && node --check notifications.mjs",
