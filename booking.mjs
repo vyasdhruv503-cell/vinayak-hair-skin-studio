@@ -29,7 +29,10 @@ async function loadSlots(){
   const r=await fetch('/api/slots?'+new URLSearchParams({service:s.id,date:form.elements.date.value}));
   let slots=[];
   if(r.ok)slots=await r.json();
-  else if(r.status===404)slots=[{id:'slot-1000',start:'10:00',end:'10:30'},{id:'slot-1130',start:'11:30',end:'12:00'},{id:'slot-1400',start:'14:00',end:'14:30'},{id:'slot-1600',start:'16:00',end:'16:30'},{id:'slot-1730',start:'17:30',end:'18:00'},{id:'slot-1900',start:'19:00',end:'19:30'}];
+  else if(r.status===404){
+   const ownerSlots=JSON.parse(localStorage.getItem('vinayak_owner_slots')||'[]').filter(x=>x.service===s.id&&x.date===form.elements.date.value);
+   slots=ownerSlots.length?ownerSlots:[{id:'slot-1000',start:'10:00',end:'10:30'},{id:'slot-1130',start:'11:30',end:'12:00'},{id:'slot-1400',start:'14:00',end:'14:30'},{id:'slot-1600',start:'16:00',end:'16:30'},{id:'slot-1730',start:'17:30',end:'18:00'},{id:'slot-1900',start:'19:00',end:'19:30'}];
+  }
   else throw Error();
   if(n!==request)return;
   slots.forEach(x=>form.elements.slot.add(new Option(`${time(x.start)} – ${time(x.end)} · With the owner`,x.id)));
@@ -86,7 +89,10 @@ async function plannerSlots(){
   const r=await fetch('/api/slots?'+new URLSearchParams({service,date}));
   let slots=[];
   if(r.ok)slots=await r.json();
-  else if(r.status===404)slots=[{id:'slot-1000',start:'10:00',end:'10:30'},{id:'slot-1130',start:'11:30',end:'12:00'},{id:'slot-1400',start:'14:00',end:'14:30'},{id:'slot-1600',start:'16:00',end:'16:30'},{id:'slot-1730',start:'17:30',end:'18:00'},{id:'slot-1900',start:'19:00',end:'19:30'}];
+  else if(r.status===404){
+   const ownerSlots=JSON.parse(localStorage.getItem('vinayak_owner_slots')||'[]').filter(x=>x.service===s.id&&x.date===form.elements.date.value);
+   slots=ownerSlots.length?ownerSlots:[{id:'slot-1000',start:'10:00',end:'10:30'},{id:'slot-1130',start:'11:30',end:'12:00'},{id:'slot-1400',start:'14:00',end:'14:30'},{id:'slot-1600',start:'16:00',end:'16:30'},{id:'slot-1730',start:'17:30',end:'18:00'},{id:'slot-1900',start:'19:00',end:'19:30'}];
+  }
   else throw Error();
   if(version!==plannerRequest)return;
   slots.forEach(s=>planner.elements.slot.add(new Option(`${time(s.start)} – ${time(s.end)}`,s.id)));
