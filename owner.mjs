@@ -19,19 +19,28 @@ async function state(){
   login.elements.password.autocomplete='current-password';
  }
 }
+const pwdToggle=$('#pwd-toggle'),ownerPwd=$('#owner-pwd');
+if(pwdToggle&&ownerPwd){
+ pwdToggle.onclick=()=>{
+  const isPass=ownerPwd.type==='password';
+  ownerPwd.type=isPass?'text':'password';
+  pwdToggle.textContent=isPass?'Hide':'Show';
+ };
+}
 login.onsubmit=async e=>{
  e.preventDefault();
  const button=login.querySelector('button');
  button.disabled=true;
  $('#login-error').textContent='';
  const pwd=login.elements.password.value;
+ const cleanPwd=pwd.trim();
  try{
   let authed=false;
   try{
-   await api('/api/login','POST',{password:pwd});
+   await api('/api/login','POST',{password:cleanPwd});
    authed=true;
   }catch(err){
-   if(pwd===OWNER_PASS){
+   if(cleanPwd===OWNER_PASS||cleanPwd.toLowerCase()===OWNER_PASS.toLowerCase()){
     sessionStorage.setItem('vinayak_owner_session','true');
     authed=true;
    }else throw err;
