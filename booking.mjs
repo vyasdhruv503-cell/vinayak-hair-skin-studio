@@ -62,11 +62,22 @@ form.onsubmit=async e=>{
   if(!b){
    const ref='BK'+Date.now().toString(36).toUpperCase();
    const slotOption=form.elements.slot.selectedOptions[0]?.text||'';
-   b={id:ref,reference:ref,service:data.service,date:data.date,start:'10:00',end:'10:30',name:data.name.trim(),phone:data.phone.trim(),locationUrl:salonMapsUrl,notification:{whatsapp:data.whatsappOptIn?'submitted':'not_configured',email:data.email?'submitted':'not_configured'}};
+   b={id:ref,reference:ref,service:data.service,date:data.date,start:'10:00',end:'10:30',name:data.name.trim(),phone:data.phone.trim(),email:data.email?data.email.trim():(signedInCustomer?.email||''),notes:data.notes?data.notes.trim():'',locationUrl:salonMapsUrl,status:'confirmed',created:new Date().toISOString(),notification:{whatsapp:data.whatsappOptIn?'submitted':'not_configured',email:data.email?'submitted':'not_configured'}};
    try{
     const list=JSON.parse(localStorage.getItem('vinayak_bookings')||'[]');
-    list.unshift({id:ref,name:b.name,phone:b.phone,service:b.service,date:b.date,start:b.start,end:b.end,status:'confirmed',created:new Date().toISOString()});
+    list.unshift(b);
     localStorage.setItem('vinayak_bookings',JSON.stringify(list));
+    const all=JSON.parse(localStorage.getItem('vinayak_all_customers')||'[]');
+    const idx=all.findIndex(c=>(b.phone&&c.phone===b.phone)||(b.email&&c.email===b.email));
+    if(idx>=0){
+     all[idx].total_bookings=(all[idx].total_bookings||0)+1;
+     if(b.name)all[idx].name=b.name;
+     if(b.phone)all[idx].phone=b.phone;
+     if(b.email)all[idx].email=b.email;
+    }else{
+     all.unshift({id:'cust-'+Date.now(),name:b.name,phone:b.phone,email:b.email||'',provider:'Customer',created:new Date().toISOString(),total_bookings:1});
+    }
+    localStorage.setItem('vinayak_all_customers',JSON.stringify(all));
    }catch{}
   }
   selected=b.reference;receipt=`VINAYAK HAIR & SKIN STUDIO\nAPPOINTMENT CONFIRMED\n\nReference: ${selected}\nService: ${(services.find(s=>s.id===b.service)||{}).name||b.service}\nDate: ${b.date}\nTime: ${time(b.start)} – ${time(b.end)} (IST)\nWith: Salon owner\nName: ${b.name}\nPhone: ${b.phone}\n\nSalon location: ${salonMapsUrl}\nVadodara, Gujarat`;$('#summary').textContent=receipt;$('#booking-location').href=salonMapsUrl;const n=b.notification||{},messages=[];for(const [channel,label] of [['whatsapp','WhatsApp'],['email','Email']]){if(n[channel]==='submitted')messages.push(`${label} confirmation requested.`);else if(n[channel]==='failed')messages.push(`${label} could not be sent. Use the location link above.`);else if(n[channel]==='not_configured')messages.push(`${label} delivery is not set up yet. Use the location link above.`);}$('#notification-status').textContent=messages.join(' ');form.hidden=true;result.hidden=false;$('#booking-location').focus();

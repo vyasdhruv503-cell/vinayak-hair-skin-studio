@@ -61,6 +61,13 @@ window.handleGoogleCredentialResponse = async function (result) {
           created: new Date().toISOString()
         };
         localStorage.setItem('vinayak_customer', JSON.stringify(customer));
+        try {
+          const all = JSON.parse(localStorage.getItem('vinayak_all_customers') || '[]');
+          const idx = all.findIndex(c => c.id === customer.id || (customer.email && c.email === customer.email));
+          if (idx >= 0) all[idx] = {...all[idx], ...customer};
+          else all.unshift(customer);
+          localStorage.setItem('vinayak_all_customers', JSON.stringify(all));
+        } catch {}
         signedInSuccessfully = true;
       }
     }
