@@ -5,7 +5,21 @@ const today=()=>new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Kolkata',year:'n
 const serviceName=id=>services.find(s=>s.id===id)?.name||id;
 const formatTime=t=>new Date('2000-01-01T'+t+':00+05:30').toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'numeric',minute:'2-digit'});
 services.forEach(s=>form.elements.service.add(new Option(s.name,s.id)));form.elements.date.min=today();form.elements.date.value=today();$('#filter-date').value=today();
-async function api(url,method='GET',body){const r=await fetch(url,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});let v={};try{v=await r.json();}catch{}if(!r.ok){if(r.status===401){sessionStorage.removeItem('vinayak_owner_session');$('#login').hidden=false;$('#dashboard').hidden=true;}throw Object.assign(Error(v.error||'Please try again.'),{status:r.status});}return v;}
+
+async function api(url,method='GET',body){
+ const r=await fetch(url,{method,headers:body?{'Content-Type':'application/json'}:{},body:body?JSON.stringify(body):undefined});
+ let v={};
+ try{v=await r.json();}catch{}
+ if(!r.ok){
+  if(r.status===401 && !sessionStorage.getItem('vinayak_owner_session')){
+   $('#login').hidden=false;
+   $('#dashboard').hidden=true;
+  }
+  throw Object.assign(Error(v.error||'Please try again.'),{status:r.status});
+ }
+ return v;
+}
+
 async function state(){
  try{
   const s=await api('/api/status');
@@ -19,6 +33,7 @@ async function state(){
   login.elements.password.autocomplete='current-password';
  }
 }
+
 const pwdToggle=$('#pwd-toggle'),ownerPwd=$('#owner-pwd');
 if(pwdToggle&&ownerPwd){
  pwdToggle.onclick=()=>{
@@ -27,6 +42,7 @@ if(pwdToggle&&ownerPwd){
   pwdToggle.textContent=isPass?'Hide':'Show';
  };
 }
+
 login.onsubmit=async e=>{
  e.preventDefault();
  const button=login.querySelector('button');
@@ -41,11 +57,11 @@ login.onsubmit=async e=>{
    authed=true;
   }catch(err){
    if(cleanPwd===OWNER_PASS||cleanPwd.toLowerCase()===OWNER_PASS.toLowerCase()){
-    sessionStorage.setItem('vinayak_owner_session','true');
     authed=true;
    }else throw err;
   }
   if(authed){
+   sessionStorage.setItem('vinayak_owner_session','true');
    login.reset();
    $('#login').hidden=true;
    $('#dashboard').hidden=false;
@@ -57,9 +73,15 @@ login.onsubmit=async e=>{
   button.disabled=false;
  }
 };
+
 function element(tag,text,cls){const e=document.createElement(tag);e.textContent=text;if(cls)e.className=cls;return e}
+
 async function refresh(){
  const isOwner=sessionStorage.getItem('vinayak_owner_session')==='true';
+ if(!isOwner && $('#dashboard').hidden) return;
+ $('#login').hidden=true;
+ $('#dashboard').hidden=false;
+
  try{
   let slots=[],bookings=[];
   try{
@@ -68,9 +90,13 @@ async function refresh(){
    if(isOwner){
     slots=JSON.parse(localStorage.getItem('vinayak_owner_slots')||'[]');
     bookings=JSON.parse(localStorage.getItem('vinayak_bookings')||'[]');
-   }else throw err;
+   }else{
+    $('#login').hidden=false;
+    $('#dashboard').hidden=true;
+    return;
+   }
   }
-  $('#login').hidden=true;$('#dashboard').hidden=false;
+
   const date=$('#filter-date').value;
   const filtered=slots.filter(s=>!date||s.date===date);
   $('#slots').replaceChildren(...filtered.map(s=>{
@@ -95,6 +121,7 @@ async function refresh(){
    return item;
   }));
   if(!filtered.length)$('#slots').append(element('p','No slots for this date. Publish an appointment above.'));
+
   const filteredBookings=bookings.filter(b=>!date||b.date===date);
   $('#bookings').replaceChildren(...filteredBookings.map(b=>{
    const item=element('div','','item'),info=element('div','');
@@ -125,6 +152,7 @@ async function refresh(){
   if(!$('#dashboard').hidden)$('#dashboard-error').textContent=e.message;
  }
 }
+
 form.onsubmit=async e=>{
  e.preventDefault();
  const button=form.querySelector('button');
@@ -149,6 +177,7 @@ form.onsubmit=async e=>{
   button.disabled=false;
  }
 };
+
 $('#refresh').onclick=refresh;
 $('#filter-date').onchange=refresh;
 $('#logout').onclick=async()=>{
@@ -158,12 +187,12 @@ $('#logout').onclick=async()=>{
  $('#login').hidden=false;
  await state();
 };
+
 if(sessionStorage.getItem('vinayak_owner_session')==='true'){
  $('#login').hidden=true;
  $('#dashboard').hidden=false;
  refresh();
 }else{
  await state();
- refresh();
 }
-setInterval(()=>{if(!$('#dashboard').hidden)refresh()},30000);
+setInterval(()=>{if(sessionStorage.getItem('vinayak_owner_session')==='true')refresh()},30000);

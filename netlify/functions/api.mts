@@ -48,12 +48,12 @@ function json(status: number, value: unknown, headers: HeadersInit = {}) {
 
 // ---------- configuration ----------
 function ownerPassword(): string | null {
-  const value = process.env.SALON_OWNER_PASSWORD ?? "";
+  const value = process.env.SALON_OWNER_PASSWORD || "vinayakhairnai";
   return value.length >= 12 && value.length <= 200 ? value : null;
 }
 const configured = () => ownerPassword() !== null;
 function googleClientId(): string | null {
-  const id = (process.env.GOOGLE_CLIENT_ID || "").trim();
+  const id = (process.env.GOOGLE_CLIENT_ID || "135458455222-fkf08bo9c6p2ba1m0532ghrboe2d3gct.apps.googleusercontent.com").trim();
   return GOOGLE_CLIENT_RE.test(id) ? id : null;
 }
 

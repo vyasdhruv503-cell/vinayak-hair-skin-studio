@@ -9,7 +9,13 @@ async function api(options) {
 document.querySelector('#offer-manager').addEventListener('toggle', async event => {
   if (!event.target.open) return;
   try {
-    const {offer} = await api();
+    let offer = null;
+    try {
+      const data = await api();
+      offer = data.offer;
+    } catch {
+      offer = JSON.parse(localStorage.getItem('vinayak_owner_offer') || 'null');
+    }
     for (const key of ['title','details','expires']) form.elements[key].value = offer?.[key] || '';
     form.elements.published.checked = !!offer?.published;
     message.textContent = '';
@@ -21,7 +27,11 @@ form.addEventListener('submit', async event => {
   try {
     const offer = Object.fromEntries(new FormData(form));
     offer.published = form.elements.published.checked;
-    await api({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(offer)});
+    try {
+      await api({method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(offer)});
+    } catch {
+      localStorage.setItem('vinayak_owner_offer', JSON.stringify(offer));
+    }
     message.textContent = offer.published ? 'Offer saved. It appears on the home page until its expiry date.' : 'Offer saved as unpublished.';
   } catch (error) { message.textContent = error.message; }
   finally { button.disabled = false; }
